@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Circular Music Player</title>
+
+  <!-- Our CSS (load last) -->
+  <link rel="stylesheet" href="styles.css?v=318" />
+
+  <!-- Font Awesome (v4.7) -->
+  <link rel="stylesheet" href="vendor/font-awesome/css/font-awesome.min.css" />
+</head>
+
+<body>
+  <!-- Player pair (player + playlist disc), centered as one unit -->
+  <div class="player-pair" id="playerPair">
+
+  <!-- Main player circle -->
+  <div class="music-player" id="player"
+       data-audio="https://cdn.pixabay.com/download/audio/2022/03/15/audio_fc17f9b072.mp3?filename=lofi-study-112191.mp3"
+       data-cover="https://images.unsplash.com/photo-1503248947681-3198a7abfcc9?auto=format&fit=crop&w=1200&q=60"
+       data-title="Lofi Study" data-artist="Audio Library">
+
+    <img class="album" id="cover"
+         src="https://images.unsplash.com/photo-1503248947681-3198a7abfcc9?auto=format&fit=crop&w=1200&q=60"
+         alt="Album cover" />
+    <video id="coverVideo" class="album" playsinline preload="metadata" loop></video>
+    <canvas id="vizCanvas" class="viz-canvas" width="0" height="0" aria-hidden="true"></canvas>
+
+    <!-- Drag overlay -->
+    <div id="dragOverlay" class="drag-overlay" aria-hidden="true">
+      <span class="hint">Drag to move • Wheel to zoom • Enter/Esc to finish • Double‑click to reset</span>
+    </div>
+
+    <div class="dash">
+      <!-- Top icons -->
+      <a href="#" class="fa fa-volume-up" id="btnMute" aria-label="Mute/Unmute" title="Mute/Unmute"></a>
+      <span class="volume-level" id="volume"><em id="volumeFill" style="width: 75%"></em></span>
+      <a href="#" class="fa fa-share" id="btnShare" aria-label="Share" title="Share"></a>
+      <!-- Replaced heart with playlist trigger -->
+      <a href="#" class="fa fa-list-ul" id="btnPlaylist" aria-label="Playlist" title="Open playlist"></a>
+
+      <!-- Seeker -->
+      <div class="seeker" id="seeker">
+        <div class="wheel"></div>
+        <svg id="seekSVG" class="seek-svg" viewBox="0 0 400 200" aria-hidden="true">
+          <defs>
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#ff2992" />
+              <stop offset="50%" stop-color="#ffb84d" />
+              <stop offset="100%" stop-color="#29d5ff" />
+            </linearGradient>
+            <filter id="softGlow">
+              <feGaussianBlur stdDeviation="2" result="glow" />
+              <feMerge>
+                <feMergeNode in="glow" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <path id="arcTrack" class="arc-track" d="M 9 0 A 191 191 0 0 0 391 0" fill="none" stroke="#1a1622" stroke-linecap="round" />
+          <path id="arcProgress" class="arc-progress" d="M 9 0 A 191 191 0 0 0 391 0" fill="none" stroke="url(#progressGradient)" stroke-linecap="round" filter="url(#softGlow)" />
+          <circle id="arcKnob" class="arc-knob" r="8" fill="#fff" stroke="#3a304d" stroke-width="4" cx="9" cy="0" />
+        </svg>
+      </div>
+
+      <!-- Transport -->
+      <div class="controls">
+        <a href="#" class="fa fa-fast-backward" id="btnBack" aria-label="Rewind 10s" title="Rewind 10s"></a>
+        <a href="#" class="fa fa-play" id="btnPlay" aria-label="Play/Pause" title="Play/Pause"></a>
+        <a href="#" class="fa fa-fast-forward" id="btnForward" aria-label="Forward 10s" title="Forward 10s"></a>
+      </div>
+
+      <!-- Info -->
+      <div class="info">
+        <i><span id="timeCurrent">0:00</span> / <span id="timeDuration">0:00</span></i>
+        <label id="title">Lofi Study</label>
+        <small id="artist">Audio Library</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Circular playlist disc (sits behind, slides out on open) -->
+  <div class="playlist-circle" id="playlistCircle" aria-hidden="true">
+    <!-- Background base color -->
+    <div class="pl-bg"></div>
+    <!-- Gradient overlay (right to left, fading to transparent toward main player) -->
+    <div class="pl-gradient"></div>
+    <div class="pl-backdrop" id="plBackdrop">
+      <img class="pl-media" id="plCover" alt="" />
+      <video class="pl-media" id="plVideo" playsinline preload="auto" loop muted></video>
+    </div>
+    <div class="pl-scrim" id="plScrim"></div>
+    <div class="pl-drag-overlay" id="plDragOverlay" aria-hidden="true"><span class="hint">Drag to move · Wheel to zoom · Enter/Esc to finish</span></div>
+
+    <!-- Clipped circular viewport for the list -->
+    <div class="pl-viewport">
+      <ul class="pl-list" id="plList"></ul>
+    </div>
+
+    <!-- Curved scrollbar hugging right semi-circle (outside the masked
+         viewport so the disc mask cannot clip the arc or knob) -->
+<svg class="pl-scroll" id="plScrollSVG" viewBox="0 0 415 415" aria-hidden="true">
+        <defs>
+          <linearGradient id="plScrollGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#ff2992" />
+            <stop offset="50%" stop-color="#ffb84d" />
+            <stop offset="100%" stop-color="#29d5ff" />
+          </linearGradient>
+          <filter id="plGlow">
+            <feGaussianBlur stdDeviation="2" result="plg" />
+            <feMerge>
+              <feMergeNode in="plg" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <!-- Right semi-circle track -->
+        <path id="plArcTrack" class="pl-arc-track" d="M 207.5 16 A 191.5 191.5 0 0 1 207.5 399" fill="none" />
+        <path id="plArcProgress" class="pl-arc-progress" d="M 207.5 16 A 191.5 191.5 0 0 1 207.5 399" fill="none" stroke="url(#plScrollGradient)"/>
+        <circle id="plArcKnob" class="pl-arc-knob" r="8" cx="207.5" cy="16" />
+      </svg>
+  </div>
+
+  </div>
+  <!-- /player-pair -->
+
+  <!-- Floating layer for kebab menus so they are never clipped -->
+  <div id="menuLayer" class="menu-layer"></div>
+
+  <!-- Audio -->
+  <audio id="audio" preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_9db9f607cb.mp3?filename=amazing-grace-11558.mp3" type="audio/mpeg" />
+  </audio>
+
+  <!-- (deployed page: no editor markup — the editor lives in dev.html) -->
+
+  <script src="vendor/colorthief/color-thief.global.js?v=138"></script>
+  <script src="script.js?v=354"></script>
+  <!-- viz3d.js (3D coaster + three.js, ~1.2MB) is lazy-loaded on demand by ensureViz3D() when coaster mode is picked — keeps initial load fast -->
+</body>
+</html>
